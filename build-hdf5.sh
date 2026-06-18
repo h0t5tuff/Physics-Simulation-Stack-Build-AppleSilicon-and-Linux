@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 #
-# Build thread-safe HDF5 (latest 1.x) — the foundation of the Geant4/remage
+# Build thread-safe HDF5 (latest stable) — the foundation of the Geant4/remage
 # stack. Patches h5cc to support `-show` (needed by CMake's module-mode
 # FindHDF5) and verifies with a find_package(HDF5) test.
 #   chmod +x build-hdf5.sh && ./build-hdf5.sh
@@ -32,13 +32,16 @@ WORKDIR="${HDF5_WORKDIR:-$HOME/Documents/HDF5}"; mkdir -p "$WORKDIR"
 read -r -p "Numeric suffix for build/install dirs (optional): " SUFFIX || true
 [[ -z "${SUFFIX:-}" || "$SUFFIX" =~ ^[0-9]+$ ]] || { echo "Suffix must be digits"; exit 1; }
 
-# --- clone + latest stable 1.x tag ---
+# --- clone + latest stable tag ---
 echo "[1/5] Fetch HDF5"
 REPO="$WORKDIR/hdf5"
 [[ -d "$REPO/.git" ]] || git clone https://github.com/HDFGroup/hdf5.git "$REPO"
 git -C "$REPO" fetch --tags --prune origin
-VER="$(git -C "$REPO" tag -l 'hdf5-1_*' | grep -E '^hdf5-1_[0-9]+_[0-9]+$' | sort -V | tail -n1)"
-[[ -n "$VER" ]] || { echo "ERROR: no stable 1.x tag found"; exit 1; }
+# HDF Group's current tag scheme is hdf5_X.Y.Z[.W] (underscore + dots); the older
+# hdf5-1_X_Y form is frozen at 1.14.3. Match the new scheme and take the highest
+# stable version (excludes -rc/-pre/snapshot/etc.), so this tracks 2.x and beyond.
+VER="$(git -C "$REPO" tag -l 'hdf5_*' | grep -E '^hdf5_[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' | sort -V | tail -n1)"
+[[ -n "$VER" ]] || { echo "ERROR: no stable release tag found"; exit 1; }
 echo "  $VER"
 git -C "$REPO" switch -C "release/$VER" "$VER"
 
@@ -109,7 +112,15 @@ project(hdf5test C)
 set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 find_package(HDF5 REQUIRED CONFIG)
 add_executable(hdf5test main.c)
-target_link_libraries(hdf5test PRIVATE hdf5-shared)
+# Config-package target name varies by version (bare hdf5-shared in 1.x; may be
+# namespaced hdf5::hdf5-shared in 2.x). Link whichever this install exports.
+if(TARGET hdf5::hdf5-shared)
+  target_link_libraries(hdf5test PRIVATE hdf5::hdf5-shared)
+elseif(TARGET hdf5-shared)
+  target_link_libraries(hdf5test PRIVATE hdf5-shared)
+else()
+  target_link_libraries(hdf5test PRIVATE ${HDF5_C_LIBRARIES} ${HDF5_LIBRARIES})
+endif()
 EOF
 printf '#include "hdf5.h"\n#include <stdio.h>\nint main(void){printf("HDF5 %s\\n",H5_VERSION);}\n' > "$T/main.c"
 cmake -S "$T" -B "$T/build" -G "$GEN" -DHDF5_DIR="$PREFIX/cmake" -DCMAKE_PREFIX_PATH="$PREFIX;/opt/homebrew"

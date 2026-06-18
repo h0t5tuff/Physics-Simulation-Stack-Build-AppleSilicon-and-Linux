@@ -17,7 +17,7 @@ failures. These four scripts build the whole stack the same way every time.
 
 | # | Script | Builds | Requires (env in) |
 |---|--------|--------|-------------------|
-| 1 | [`build-hdf5.sh`](build-hdf5.sh) | HDF5 latest 1.x — thread-safe, shared (HL / C++ / Fortran / Java / tests **off**) | — |
+| 1 | [`build-hdf5.sh`](build-hdf5.sh) | HDF5 latest stable — thread-safe, shared (HL / C++ / Fortran / Java / tests **off**) | — |
 | 2 | [`build-geant4.sh`](build-geant4.sh) | Geant4 latest stable — MT, GDML, Qt/OpenGL vis, HDF5 analysis, datasets | `HDF5_ROOT` |
 | 3 | [`build-bxdecay0.sh`](build-bxdecay0.sh) | BxDecay0 with the Geant4 extension (double-beta generator) | `GEANT4_BASE` |
 | 4 | [`build-remage.sh`](build-remage.sh) | remage — links Geant4 + HDF5 + BxDecay0 (ROOT off) | `GEANT4_BASE`, `HDF5_ROOT`, `BXDECAY0_PREFIX` |
@@ -70,7 +70,7 @@ Override the build tool with `GENERATOR`. Each script ends with a self-test
 remage      ▲   LEGEND simulation layer
 BxDecay0    │   double-beta decay generator
 Geant4      │   MT, GDML, Qt/OpenGL, HDF5 analysis
-HDF5 1.x    │   thread-safe, C API
+HDF5 latest │   thread-safe, C API
 ```
 
 ROOT (via Homebrew) is **optional** — not needed by the four-script chain, but
