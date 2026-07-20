@@ -3,41 +3,27 @@
 From-source build chain for the **LEGEND** simulation software:
 **Geant4 → BxDecay0 → remage**.
 
-The scripts give one reproducible, CMake-discoverable toolchain that
-won't collide with system or Homebrew installs. Primary target is macOS (Apple
-Silicon); Linux notes appear in the examples at the bottom.
-
-## Why from source
-
-remage needs a consistent dependency chain. Mixing system/Homebrew libraries
-causes silent ABI and threading failures. These three scripts build the whole
-stack the same way every time.
-
-## The scripts
-
-| # | Script | Builds | Requires (env in) |
-|---|--------|--------|-------------------|
-| 1 | [`build-geant4.sh`](build-geant4.sh) | Geant4 latest stable — MT, GDML, Qt/OpenGL vis, datasets | — |
-| 2 | [`build-bxdecay0.sh`](build-bxdecay0.sh) | BxDecay0 with the Geant4 extension (double-beta generator) | `GEANT4_BASE` |
-| 3 | [`build-remage.sh`](build-remage.sh) | remage — links Geant4 + BxDecay0 (ROOT off) | `GEANT4_BASE`, `BXDECAY0_PREFIX` |
+| #   | Script                                   | Builds                                                     | Requires (env in)                |
+| --- | ---------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| 1   | [`build-geant4.sh`](build-geant4.sh)     | Geant4 latest stable — MT, GDML, Qt/OpenGL vis, datasets   | —                                |
+| 2   | [`build-bxdecay0.sh`](build-bxdecay0.sh) | BxDecay0 with the Geant4 extension (double-beta generator) | `GEANT4_BASE`                    |
+| 3   | [`build-remage.sh`](build-remage.sh)     | remage — links Geant4 + BxDecay0 (ROOT off)                | `GEANT4_BASE`, `BXDECAY0_PREFIX` |
 
 Each script: picks **Ninja** if present (else Unix Makefiles), prompts for an
 optional numeric **suffix** so multiple builds can live side by side, and offers
 to write a marked block to `~/.zshrc` exporting the env var the next stage needs.
 
-> **Note:** this chain builds no HDF5, so Geant4 is configured without HDF5
-> analysis and remage is built **without LH5 output support**. remage will abort
-> at output time with `HDF5 and LH5 support is not available!`.
+> **Note:** ROOT is via Homebrew. no HDF5/LH5 support untill geant4 people come to their senses
 
-## Usage (order matters)
+## Usage
 
 ```bash
 chmod +x build-*.sh
 
-./build-geant4.sh     # exports GEANT4_BASE
+./build-geant4.sh
 source ~/.zshrc
 
-./build-bxdecay0.sh   # exports BXDECAY0_PREFIX
+./build-bxdecay0.sh
 source ~/.zshrc
 
 ./build-remage.sh
@@ -48,11 +34,11 @@ shell) between stages.**
 
 **Default work dirs** (override with the env var in parentheses):
 
-| Stage | Location | Override |
-|-------|----------|----------|
-| Geant4 | `~/Documents/GEANT4` | `GEANT4_WORKDIR` |
-| BxDecay0 | `~/Documents/BXDECAY0` | `BXDECAY0_HOME` |
-| remage | `~/Documents/REMAGE` | `REMAGE_WORKDIR` |
+| Stage    | Location               | Override         |
+| -------- | ---------------------- | ---------------- |
+| Geant4   | `~/Documents/GEANT4`   | `GEANT4_WORKDIR` |
+| BxDecay0 | `~/Documents/BXDECAY0` | `BXDECAY0_HOME`  |
+| remage   | `~/Documents/REMAGE`   | `REMAGE_WORKDIR` |
 
 Override the build tool with `GENERATOR`. Each script ends with a self-test
 (`find_package` + link/`otool` check) so a stage fails loudly, not later.
@@ -65,19 +51,11 @@ BxDecay0    │   double-beta decay generator
 Geant4      │   MT, GDML, Qt/OpenGL
 ```
 
-ROOT (via Homebrew) is **optional** — not needed by the four-script chain, but
-used by some examples below (`bacon2Data`, `BACONCalibrationSimulation`).
-
 ---
 
-# Examples & run notes
+# Examples:
 
-Working notes for running simulations on top of this stack. Paths, branches, and
-line numbers are reproduced as-is from the author's setup — adjust to yours.
-
-## ROOT
-
-### bacon2Data
+## ROOT sim --> bacon2Data
 
 **Build**
 
@@ -98,10 +76,24 @@ ln -s /opt/homebrew/opt/root/etc/root/Makefile.arch .
 ln -s /snap/root-framework/current/usr/local/etc/Makefile.arch .
 ```
 
+**Gains file** — put in `bobj`, then symlink in place so `postAna` uses it:
+
+```bash
+
+ln -s gains-04_16_2026-04_16_2026-2026-06-12-15-00.root gainsCurrent.root
+```
+
 **Hard-code path** if you're not cloning in your home dir — edit `bobj/makefile`:
 
 ```make
 INSTALLNAME  :=  $(HOME)/ROOT/bacon2Data/bobj/$(LIBRARY)
+```
+
+**Create data dirs** and put `btbSim` / `anacg` files there:
+
+```bash
+cd compiled
+mkdir rootData caenData
 ```
 
 **Build**
@@ -109,43 +101,6 @@ INSTALLNAME  :=  $(HOME)/ROOT/bacon2Data/bobj/$(LIBRARY)
 ```bash
 make clean; make
 cd ../compiled && make clean; make
-```
-
-**Create data dirs** and put `btbSim` / `anacg` files there:
-
-```bash
-# macOS (in compiled):
-mkdir caenData
-mkdir rootData
-# Linux (in compiled and in bacon2Data):
-ln -s /mnt/Data2/BaconRun5Data/rootData/ rootData
-ln -s /mnt/Data2/BaconRun4Data/caenData/ caenData
-ln -s /home/gold/bacon2Data/compiled/ compiledGold
-ln -s /home/gold/bacon2Data/bobj/ bobjGold
-```
-
-**Gains files** — put in `bobj`, then symlink in place so `postAna` uses them:
-
-```bash
-ln -s <gainPeak root file> gainPeakCurrent.root
-ln -s <gainSum root file> gainSumCurrent.root
-```
-
-**Run executables**
-
-```bash
-# macOS:
-cd compiled
-btbSim <events number>            # then copy root file to /rootData
-anacg <root file from btbSim>     # product root file lives in /caenData
-postAna <etag> <etag> <max entries>
-#   first put a summary/post root file in /compiled,
-#   then set that filename in gain.C & gainSum.C (ln288)
-
-# Linux:
-cd bacon2Data
-nohup ./anacDir.py 00_00_0000 >& anacDir00_00_0000.log &
-top
 ```
 
 ### BaconMonitor
@@ -380,33 +335,39 @@ _Placeholder for your own LEGEND study._
 ### remage — systematic workflow
 
 **Step 1 — Geometry sanity + reproducibility**
+
 - Always run a batch macro first (no UI) and confirm: the overlap check is clean
   enough for tracking, and the event rate is stable.
 - Fix geometry before physics — otherwise you chase ghosts.
 
 **Step 2 — Single-process intuition (HPGe)**
+
 - Run monoenergetic gammas and electrons and build intuition:
   - Photopeak vs Compton continuum (gamma)
   - Bremsstrahlung + MCS + range (electron)
   - Sensitivity to dead layer / holder material
 
 **Step 3 — Add realistic sources (decays, chains)**
+
 - Use BxDecay0 / built-in decay machinery where appropriate.
 - Compare "truth-level emission" vs "detected deposition".
 
 **Step 4 — Add correlated handles (tracks, timing, veto)**
+
 - Turn on track output schemes where available.
 - For LAr optics: treat "light yield → veto" as a physics handle.
 
 ### LEGEND-200
 
 **What backgrounds survive all cuts near Q_ββ?** In simulation lingo:
+
 - Generate backgrounds in the correct place (materials and surfaces).
 - Transport them through the real geometry.
 - Record observables used in analysis: energy in detectors, multiplicity,
   distances, timing/veto flags.
 
 **What is the signal efficiency?**
+
 - Generate 0νββ decays in the active volume.
 - Track energy depositions and topology proxies (multi-site vs single-site).
 - Include detector effects later (resolution, thresholds).
