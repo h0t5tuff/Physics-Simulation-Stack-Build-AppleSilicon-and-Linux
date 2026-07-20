@@ -1,44 +1,38 @@
 # Physics Simulation Stack — Build Scripts (Apple Silicon & Linux)
 
 From-source build chain for the **LEGEND** simulation software:
-**HDF5 → Geant4 → BxDecay0 → remage**.
+**Geant4 → BxDecay0 → remage**.
 
-The scripts give one reproducible, thread-safe, CMake-discoverable toolchain that
+The scripts give one reproducible, CMake-discoverable toolchain that
 won't collide with system or Homebrew installs. Primary target is macOS (Apple
 Silicon); Linux notes appear in the examples at the bottom.
 
 ## Why from source
 
-Geant4 multithreading and remage require a **thread-safe HDF5** and a consistent
-dependency chain. Mixing system/Homebrew libraries causes silent ABI and threading
-failures. These four scripts build the whole stack the same way every time.
+remage needs a consistent dependency chain. Mixing system/Homebrew libraries
+causes silent ABI and threading failures. These three scripts build the whole
+stack the same way every time.
 
 ## The scripts
 
 | # | Script | Builds | Requires (env in) |
 |---|--------|--------|-------------------|
-| 1 | [`build-hdf5.sh`](build-hdf5.sh) | HDF5 latest stable — thread-safe, shared (HL / C++ / Fortran / Java / tests **off**) | — |
-| 2 | [`build-geant4.sh`](build-geant4.sh) | Geant4 latest stable — MT, GDML, Qt/OpenGL vis, HDF5 analysis, datasets | `HDF5_ROOT` |
-| 3 | [`build-bxdecay0.sh`](build-bxdecay0.sh) | BxDecay0 with the Geant4 extension (double-beta generator) | `GEANT4_BASE` |
-| 4 | [`build-remage.sh`](build-remage.sh) | remage — links Geant4 + HDF5 + BxDecay0 (ROOT off) | `GEANT4_BASE`, `HDF5_ROOT`, `BXDECAY0_PREFIX` |
+| 1 | [`build-geant4.sh`](build-geant4.sh) | Geant4 latest stable — MT, GDML, Qt/OpenGL vis, datasets | — |
+| 2 | [`build-bxdecay0.sh`](build-bxdecay0.sh) | BxDecay0 with the Geant4 extension (double-beta generator) | `GEANT4_BASE` |
+| 3 | [`build-remage.sh`](build-remage.sh) | remage — links Geant4 + BxDecay0 (ROOT off) | `GEANT4_BASE`, `BXDECAY0_PREFIX` |
 
 Each script: picks **Ninja** if present (else Unix Makefiles), prompts for an
 optional numeric **suffix** so multiple builds can live side by side, and offers
 to write a marked block to `~/.zshrc` exporting the env var the next stage needs.
 
-Two details worth knowing:
-
-- **HDF5 C++ is intentionally OFF** — it is mutually exclusive with thread-safety,
-  which Geant4-MT requires. remage uses only the HDF5 **C** API (via Geant4 analysis).
-- **`h5cc` is patched** to support `-show`, which CMake's module-mode `FindHDF5` needs.
+> **Note:** this chain builds no HDF5, so Geant4 is configured without HDF5
+> analysis and remage is built **without LH5 output support**. remage will abort
+> at output time with `HDF5 and LH5 support is not available!`.
 
 ## Usage (order matters)
 
 ```bash
 chmod +x build-*.sh
-
-./build-hdf5.sh       # exports HDF5_ROOT
-source ~/.zshrc       # (or open a new shell)
 
 ./build-geant4.sh     # exports GEANT4_BASE
 source ~/.zshrc
@@ -56,7 +50,6 @@ shell) between stages.**
 
 | Stage | Location | Override |
 |-------|----------|----------|
-| HDF5 | `~/Documents/HDF5` | `HDF5_WORKDIR` |
 | Geant4 | `~/Documents/GEANT4` | `GEANT4_WORKDIR` |
 | BxDecay0 | `~/Documents/BXDECAY0` | `BXDECAY0_HOME` |
 | remage | `~/Documents/REMAGE` | `REMAGE_WORKDIR` |
@@ -69,8 +62,7 @@ Override the build tool with `GENERATOR`. Each script ends with a self-test
 ```
 remage      ▲   LEGEND simulation layer
 BxDecay0    │   double-beta decay generator
-Geant4      │   MT, GDML, Qt/OpenGL, HDF5 analysis
-HDF5 latest │   thread-safe, C API
+Geant4      │   MT, GDML, Qt/OpenGL
 ```
 
 ROOT (via Homebrew) is **optional** — not needed by the four-script chain, but

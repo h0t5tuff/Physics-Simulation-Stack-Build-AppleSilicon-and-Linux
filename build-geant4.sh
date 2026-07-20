@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 #
-# Build Geant4 (latest stable) with MT, GDML, Qt/OpenGL vis and HDF5 analysis,
-# linked against the locally built thread-safe HDF5. Requires HDF5_ROOT.
+# Build Geant4 (latest stable) with MT, GDML and Qt/OpenGL vis.
 #   chmod +x build-geant4.sh && ./build-geant4.sh
 
 yesno() { local a; read -r -p "$1 " a || true; [[ "${a:-$2}" =~ ^[Yy] ]]; }
@@ -28,17 +27,11 @@ zshrc_block() {
   rm -f "$zrc.tmp"
 }
 
-# --- preflight: optional Homebrew deps + HDF5 ---
+# --- preflight: optional Homebrew deps ---
 if command -v brew >/dev/null 2>&1 && yesno "Install/verify Homebrew build deps? [y/N]:" N; then
   brew update && brew install cmake ninja pkgconf git wget expat xerces-c qt python make \
     libx11 clhep jpeg libxi libxmu open-mpi || true
 fi
-
-: "${HDF5_ROOT:?export HDF5_ROOT first (run build-hdf5.sh)}"
-HDF5_DIR="${HDF5_DIR:-$HDF5_ROOT/cmake}"
-[[ -d "$HDF5_DIR" ]] || { echo "ERROR: HDF5_DIR not found: $HDF5_DIR"; exit 1; }
-[[ -x "$HDF5_ROOT/bin/h5cc" ]] || { echo "ERROR: h5cc not found in $HDF5_ROOT/bin"; exit 1; }
-"$HDF5_ROOT/bin/h5cc" -showconfig | grep -Ei "HDF5 Version|Threadsafety" || true
 
 WORKDIR="${GEANT4_WORKDIR:-$HOME/Documents/GEANT4}"; mkdir -p "$WORKDIR"
 read -r -p "Numeric suffix for build/install dirs (optional): " SUFFIX || true
@@ -70,8 +63,7 @@ cmake -S "$REPO" -B "$BUILD" -G "$GEN" \
   -DGEANT4_USE_GDML=ON \
   -DGEANT4_USE_QT=ON \
   -DGEANT4_USE_OPENGL=ON \
-  -DGEANT4_USE_HDF5=ON \
-  -DCMAKE_PREFIX_PATH="$HDF5_ROOT;/opt/homebrew"
+  -DCMAKE_PREFIX_PATH="/opt/homebrew"
 
 echo "[3/4] Build + install"
 build_retry "$BUILD"
@@ -90,7 +82,7 @@ EOF
   echo "  ~/.zshrc updated"
 fi
 
-# --- verify: find_package(Geant4) + G4analysis links HDF5 ---
+# --- verify: find_package(Geant4) + G4analysis links ---
 echo "[4/4] CMake link test"
 T="$(mktemp -d)"
 cat > "$T/CMakeLists.txt" <<'EOF'
@@ -102,9 +94,9 @@ target_link_libraries(g4test PRIVATE Geant4::G4analysis)
 EOF
 printf '#include "G4Version.hh"\n#include <iostream>\nint main(){std::cout<<G4VERSION_NUMBER<<"\\n";}\n' > "$T/main.cc"
 cmake -S "$T" -B "$T/build" -G "$GEN" \
-  -DGeant4_DIR="$PREFIX/lib/cmake/Geant4" -DCMAKE_PREFIX_PATH="$HDF5_ROOT;/opt/homebrew"
+  -DGeant4_DIR="$PREFIX/lib/cmake/Geant4" -DCMAKE_PREFIX_PATH="/opt/homebrew"
 cmake --build "$T/build" -j"$JOBS"
-otool -L "$T/build/g4test" | grep -E 'G4analysis|hdf5' || true
+otool -L "$T/build/g4test" | grep -E 'G4analysis|G4' || true
 rm -rf "$T"
 
 echo "DONE: Geant4 $VER ready at $PREFIX"

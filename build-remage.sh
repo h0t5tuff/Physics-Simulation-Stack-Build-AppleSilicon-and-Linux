@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 #
-# Build remage against the locally built stack: Geant4 + thread-safe HDF5 +
-# BxDecay0. Requires GEANT4_BASE, HDF5_ROOT, BXDECAY0_PREFIX.
+# Build remage against the locally built stack: Geant4 + BxDecay0.
+# Requires GEANT4_BASE, BXDECAY0_PREFIX.
 #   chmod +x build-remage.sh && ./build-remage.sh
 
 yesno() { local a; read -r -p "$1 " a || true; [[ "${a:-$2}" =~ ^[Yy] ]]; }
@@ -17,16 +17,10 @@ build_retry() {
   done
 }
 
-# --- preflight: Geant4, HDF5 (thread-safe C API), BxDecay0, python3 ---
+# --- preflight: Geant4, BxDecay0, python3 ---
 : "${GEANT4_BASE:?export GEANT4_BASE first (run build-geant4.sh)}"
 [[ -f "$GEANT4_BASE/lib/cmake/Geant4/Geant4Config.cmake" ]] \
   || { echo "ERROR: Geant4Config.cmake not found under $GEANT4_BASE/lib/cmake/Geant4"; exit 1; }
-
-: "${HDF5_ROOT:?export HDF5_ROOT first (run build-hdf5.sh)}"
-HDF5_DIR="${HDF5_DIR:-$HDF5_ROOT/cmake}"
-[[ -d "$HDF5_DIR" ]] || { echo "ERROR: HDF5_DIR not found: $HDF5_DIR"; exit 1; }
-[[ -x "$HDF5_ROOT/bin/h5cc" ]] || { echo "ERROR: h5cc not found: $HDF5_ROOT/bin/h5cc"; exit 1; }
-"$HDF5_ROOT/bin/h5cc" -showconfig | grep -Ei "HDF5 Version|Threadsafety" || true
 
 : "${BXDECAY0_PREFIX:?export BXDECAY0_PREFIX first (run build-bxdecay0.sh)}"
 compgen -G "$BXDECAY0_PREFIX/lib/cmake/*/BxDecay0Config.cmake" >/dev/null \
@@ -67,14 +61,12 @@ cmake -S "$REPO" -B "$BUILD" -G "$GEN" \
   -DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON \
   -DPython3_EXECUTABLE="$PY" \
   -DGeant4_DIR="$GEANT4_BASE/lib/cmake/Geant4" \
-  -DHDF5_ROOT="$HDF5_ROOT" \
-  -DHDF5_DIR="$HDF5_DIR" \
   -DRMG_USE_BXDECAY0=ON \
   -DRMG_USE_ROOT=OFF \
   -DRMG_BUILD_DOCS=OFF \
   -DRMG_BUILD_EXAMPLES=OFF \
   -DBUILD_TESTING=OFF \
-  -DCMAKE_PREFIX_PATH="$HDF5_ROOT;$GEANT4_BASE;$BXDECAY0_PREFIX;/opt/homebrew"
+  -DCMAKE_PREFIX_PATH="$GEANT4_BASE;$BXDECAY0_PREFIX;/opt/homebrew"
 
 echo "[3/4] Build + install"
 build_retry "$BUILD"
@@ -89,6 +81,6 @@ else
   echo "  WARN: remage binary not found at $PREFIX/bin/remage"
 fi
 first="$(ls -1 "$PREFIX"/lib/*.dylib 2>/dev/null | head -n1 || true)"
-[[ -n "$first" ]] && otool -L "$first" | grep -E 'Geant4|G4|hdf5|BxDecay0' || true
+[[ -n "$first" ]] && otool -L "$first" | grep -E 'Geant4|G4|BxDecay0' || true
 
 echo "DONE: remage $VER ready at $PREFIX"
