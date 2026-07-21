@@ -1,0 +1,52 @@
+# ---- build in bobj/ ----
+bobj/Makefile.arch
+bobj/gains-04_16_2026-04_16_2026-2026-06-12-15-00.root
+bobj/gainsCurrent.root
+
+# ----- build artifacts in bobj/ and in compiled/ ------
+bobj/*.o
+bobj/*.so
+bobj/*_Dict.*
+bobj/*.pcm
+
+compiled/*.o
+compiled/*.dSYM/
+compiled/ana1
+compiled/anaca
+compiled/anacg
+compiled/btbSim
+compiled/btbSim5
+compiled/build
+compiled/convertRaw
+compiled/convertRawCAEN
+compiled/postAna
+compiled/sis
+compiled/sisana
+compiled/summary
+
+# ---- junk ----
+*.swp
+.*.swp
+*~
+.DS_Store
+*.dSYM/
+
+# ---- Dirs i created and files i edited(*_G) or created(*_T) ----
+compiled/caenData/
+compiled/rootData/
+*_G.cc
+*_G.C
+*_G.hh
+*_G.sh
+compiled/local/
+*_T.cc
+*_T.C
+*_T.hh
+*_T.sh
+
+# ---- pipeline outputs ----
+*.pdf
+*.root
+
+# ---- keep this gitignore local ----
+# .gitignore
