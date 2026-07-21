@@ -1,4 +1,4 @@
-# Physics Simulation Stack — Build Scripts (Apple Silicon & Linux)
+# Physics Simulation Stack — Build Scripts
 
 From-source build chain for the **LEGEND** simulation software:
 **Geant4 → BxDecay0 → remage**.
@@ -14,8 +14,6 @@ optional numeric **suffix** so multiple builds can live side by side, and offers
 to write a marked block to `~/.zshrc` exporting the env var the next stage needs.
 
 > **Note:** ROOT is via Homebrew. no HDF5/LH5 support untill geant4 people come to their senses
-
-## Usage
 
 ```bash
 chmod +x build-*.sh
@@ -42,14 +40,6 @@ shell) between stages.**
 
 Override the build tool with `GENERATOR`. Each script ends with a self-test
 (`find_package` + link/`otool` check) so a stage fails loudly, not later.
-
-## Dependency stack
-
-```
-remage      ▲   LEGEND simulation layer
-BxDecay0    │   double-beta decay generator
-Geant4      │   MT, GDML, Qt/OpenGL
-```
 
 ---
 
@@ -115,7 +105,7 @@ git ls-files -v | grep '^S' # list what's hidden
 git update-index --no-skip-worktree <file> # un-hide one
 ```
 
-### BaconMonitor
+**BaconMonitor**
 
 ```bash
 # macOS:
@@ -127,14 +117,17 @@ sudo visudo
 #   Tensor ALL=(ALL) NOPASSWD: SETENV: /usr/bin/python3 /home/Tensor/BaconMonitor2_tensor.py
 ```
 
-## Geant4
+## GEANT4 sim --> BACONCalibrationSimulation
 
-### BACONCalibrationSimulation — debugging log
+A liquid-argon **calibration** sim: a CAD/STL source assembly (copper housing, Al foil, SiPM windows) in liquid argon.
+Records LAr energy deposition and SiPM photon detection to a **ROOT** file.
+
+**debugging log**
 
 A successful problem-solving session getting Alex's sim running: header scoping
 fixes, STL path handling, env-based ROOT path flexibility, and final launch.
 
-**1. Geant4 header scoping — `G4Track` undefined** (`unknown type name 'G4Track'`)
+**_1. Geant4 header scoping — `G4Track` undefined_** (`unknown type name 'G4Track'`)
 
 Recent Geant4 requires explicit class headers; forward declarations and umbrella
 includes are no longer sufficient. Fix — forward declare in the header
@@ -148,7 +141,7 @@ class G4Track;
 #include "G4Track.hh"
 ```
 
-**2. STL rejected — CADMesh expects ASCII** (error near line 1: STL must start with `solid`)
+**_2. STL rejected — CADMesh expects ASCII_** (error near line 1: STL must start with `solid`)
 
 First suspected a binary (not ASCII) STL, or a wrong path. Sanity checks:
 
@@ -194,38 +187,39 @@ Finally, adjusted the ROOT-file paths in all macros, and removed anything saying
 **Build**
 
 ```bash
-cmake -S . -B build -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DWITH_GEANT4_UIVIS=ON \
-  -DCMAKE_PREFIX_PATH="$(geant4-config --prefix);$ROOT_DIR"
-cmake --build build -j"$(sysctl -n hw.ncpu)"
+export CMAKE_PREFIX_PATH="$HOME/Documents/GEANT4/install-v11.4.2;/opt/homebrew/opt/root;/opt/homebrew"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(sysctl -n hw.ncpu)        # -> build/BACONCalibrationSimulation
 ```
 
-### Other Geant4 examples
+**Run**
 
-- **underground_physics** — shielding optimization and neutron moderation logic.
-  Add a simple slab of material in `DetectorConstruction`; compare rates / energy
-  deposition downstream.
+from the project root, not from build/
 
-  ```bash
-  cmake -S . -B build -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DWITH_GEANT4_UIVIS=ON \
-    -DDMXENV_GPS_USE=ON \
-    -DCMAKE_PREFIX_PATH="$(geant4-config --prefix);$ROOT_DIR"
-  cmake --build build -j"$(sysctl -n hw.ncpu)"
-  ```
+The STL path is relative (`../BACONCalibrationSimulation/STLFiles/`), so the working dir must be the project root.
+Also set the macro's output path to a folder that exists on your Mac (`setOutputFilePath .` writes to the project root).
 
-- **lAr_calorimeter** — LAr veto light-collection sensitivity. Change scintillation
-  yield and absorption length; measure detected photoelectrons vs distance/geometry.
-- **xray_fluorescence** — pick a material, fire gammas/electrons at a surface, and
-  verify the fluorescence X-ray lines appear in the output spectrum (background line
-  ID and detector material-response sanity checks).
-- **IAEAphsp** — realistic source generation reusing precomputed phase-space inputs;
-  reproducible source-modeling patterns.
-- **human_phantom** — geometry organization and run control.
+```bash
+cd ~/Documents/GEANT4/BACONCalibrationSimulation
+./build/BACONCalibrationSimulation gammarun.mac     # 60 keV γ (calibration)
+./build/BACONCalibrationSimulation opticalrun.mac   # 128 nm scintillation photons
+```
 
-## remage
+**Interpret**
+
+Output is a ROOT file with three trees. The main one:
+
+```bash
+root -l <output>.root
+root [] eventtree->Draw("LAr_totaledep_keV")     # energy spectrum: 60 keV photopeak + Compton continuum
+root [] eventtree->Draw("SiPM_nphotons_detected")
+```
+
+- `primarytree` — one row per source particle
+- `eventtree` — energy + light per event (main analysis)
+- `steptree` — every interaction step (detailed)
+
+## REMAGE
 
 **Build** (against the installed remage — set `REMAGE_PREFIX` to its install dir,
 and `ROOT_DIR` if using ROOT):
@@ -342,7 +336,7 @@ Drives material choice + neutron moderation strategy.
 
 ### examples/07-my-legend-study
 
-_Placeholder for your own LEGEND study._
+_Placeholder for my own LEGEND study._
 
 ### remage — systematic workflow
 
