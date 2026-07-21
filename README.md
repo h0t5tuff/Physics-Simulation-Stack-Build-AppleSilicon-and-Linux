@@ -103,6 +103,18 @@ make clean; make
 cd ../compiled && make clean; make
 ```
 
+**Added a .gitignore locally (for untracked files)**
+
+assets/.gitognore
+
+**Hiding build artifacts locally (for tracked files)**
+
+```bash
+git update-index --skip-worktree # hide artifacts of building
+git ls-files -v | grep '^S' # list what's hidden
+git update-index --no-skip-worktree <file> # un-hide one
+```
+
 ### BaconMonitor
 
 ```bash
